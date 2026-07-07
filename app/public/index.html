@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise CI/CD Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #07090d;
+            --panel: #11151c;
+            --panel-2: #171c26;
+            --border: #2a3140;
+            --text: #e6edf7;
+            --muted: #8b95a8;
+            --success: #22c55e;
+            --success-soft: rgba(34, 197, 94, 0.14);
+            --progress: #f59e0b;
+            --progress-soft: rgba(245, 158, 11, 0.14);
+            --failed: #ef4444;
+            --failed-soft: rgba(239, 68, 68, 0.14);
+            --pending: #4b5563;
+            --skipped: #64748b;
+            --accent: #6366f1;
+            --accent-soft: rgba(99, 102, 241, 0.15);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top, rgba(99, 102, 241, 0.12), transparent 32%),
+                radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.08), transparent 28%),
+                var(--bg);
+            padding: 32px 20px 48px;
+        }
+
+        .dashboard {
+            max-width: 1280px;
+            margin: 0 auto;
+            background: linear-gradient(180deg, rgba(23, 28, 38, 0.96), rgba(17, 21, 28, 0.98));
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+            overflow: hidden;
+        }
+
+        .hero {
+            padding: 32px 36px 24px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.08), transparent 55%);
+        }
+
+        .hero-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .eyebrow {
+            font-size: 12px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.5rem, 2vw, 2rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+            max-width: 640px;
+        }
+
+        .status-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+        }
+
+        .status-badge .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .status-badge.success { background: var(--success-soft); color: var(--success); border-color: rgba(34, 197, 94, 0.35); }
+        .status-badge.progress { background: var(--progress-soft); color: var(--progress); border-color: rgba(245, 158, 11, 0.35); }
+        .status-badge.failed { background: var(--failed-soft); color: var(--failed); border-color: rgba(239, 68, 68, 0.35); }
+        .status-badge.pending { background: rgba(75, 85, 99, 0.18); color: var(--muted); border-color: rgba(75, 85, 99, 0.35); }
+
+        .status-badge.progress .dot { animation: pulse 1.4s infinite; }
+
+        .meta-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .meta-chip {
+            font-size: 12px;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 6px 12px;
+        }
+
+        .pipeline-section {
+            padding: 28px 24px 12px;
+        }
+
+        .section-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 0 24px;
+            padding: 0 12px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .pipeline-scroll {
+            overflow-x: auto;
+            padding: 8px 8px 24px;
+        }
+
+        .pipeline-track {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(7, minmax(150px, 1fr));
+            gap: 12px;
+            min-width: 1080px;
+            padding: 0 12px;
+        }
+
+        .pipeline-track::before,
+        .pipeline-progress {
+            content: "";
+            position: absolute;
+            top: 34px;
+            left: 48px;
+            right: 48px;
+            height: 4px;
+            border-radius: 999px;
+            z-index: 0;
+        }
+
+        .pipeline-track::before {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .pipeline-progress {
+            width: auto;
+            background: linear-gradient(90deg, var(--success), #34d399);
+            transform-origin: left center;
+            transition: width 0.6s ease;
+            box-shadow: 0 0 18px rgba(34, 197, 94, 0.35);
+        }
+
+        .stage-card {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 0 4px;
+        }
+
+        .step-index {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        .stage-icon {
+            width: 68px;
+            height: 68px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            background: var(--panel-2);
+            border: 2px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+
+        .stage-card:hover .stage-icon { transform: translateY(-3px); }
+
+        .stage-icon.success {
+            border-color: rgba(34, 197, 94, 0.55);
+            background: linear-gradient(180deg, rgba(34, 197, 94, 0.18), rgba(34, 197, 94, 0.06));
+            box-shadow: 0 0 24px rgba(34, 197, 94, 0.18);
+        }
+
+        .stage-icon.in_progress {
+            border-color: rgba(245, 158, 11, 0.65);
+            background: linear-gradient(180deg, rgba(245, 158, 11, 0.18), rgba(245, 158, 11, 0.06));
+            animation: pulse-ring 1.6s infinite;
+        }
+
+        .stage-icon.failed {
+            border-color: rgba(239, 68, 68, 0.65);
+            background: linear-gradient(180deg, rgba(239, 68, 68, 0.18), rgba(239, 68, 68, 0.06));
+            box-shadow: 0 0 24px rgba(239, 68, 68, 0.18);
+        }
+
+        .stage-icon.pending {
+            opacity: 0.72;
+        }
+
+        .stage-icon.skipped {
+            border-style: dashed;
+            opacity: 0.55;
+        }
+
+        .stage-name {
+            margin-top: 16px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--text);
+        }
+
+        .stage-status {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+        }
+
+        .stage-status.success { color: var(--success); background: var(--success-soft); }
+        .stage-status.in_progress { color: var(--progress); background: var(--progress-soft); }
+        .stage-status.failed { color: var(--failed); background: var(--failed-soft); }
+        .stage-status.skipped { color: var(--skipped); }
+
+        .terminal-section {
+            padding: 0 24px 32px;
+        }
+
+        .terminal {
+            background: #05070b;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            background: #0d1118;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .term-dots { display: flex; gap: 8px; }
+        .term-dot { width: 11px; height: 11px; border-radius: 50%; }
+        .dot-red { background: #ff5f57; }
+        .dot-yellow { background: #febc2e; }
+        .dot-green { background: #28c840; }
+
+        .terminal-title {
+            font-family: "JetBrains Mono", monospace;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .terminal-body {
+            min-height: 280px;
+            max-height: 320px;
+            overflow-y: auto;
+            padding: 18px 20px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 13px;
+            line-height: 1.65;
+            color: #93c5fd;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .log-sys { color: #cbd5e1; }
+        .log-success { color: #4ade80; }
+        .log-error { color: #f87171; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.55; transform: scale(0.92); }
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35); }
+            70% { box-shadow: 0 0 0 14px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+
+        @media (max-width: 900px) {
+            .hero { padding: 24px 20px 18px; }
+            .pipeline-section, .terminal-section { padding-left: 16px; padding-right: 16px; }
+            .status-panel { align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <section class="hero">
+        <div class="hero-top">
+            <div>
+                <div class="eyebrow">Immverse.ai Delivery</div>
+                <h1>DevOps Live Delivery Pipeline</h1>
+                <p class="subtitle">Track every stage from Git push through build, ECR deploy, server rollout, and failure alerts.</p>
+            </div>
+            <div class="status-panel">
+                <div id="overall-status" class="status-badge pending">
+                    <span class="dot"></span>
+                    <span id="overall-status-text">Connecting...</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-chip" id="build-meta">Build #—</span>
+                    <span class="meta-chip" id="source-meta">Source: live</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pipeline-section">
+        <div class="section-title">
+            <span>Pipeline Stages</span>
+            <span id="stage-summary">0 / 7 complete</span>
+        </div>
+        <div class="pipeline-scroll">
+            <div class="pipeline-track" id="pipeline-track">
+                <div class="pipeline-progress" id="pipeline-progress" style="width: 0;"></div>
+                <div id="pipeline-nodes" style="display: contents;"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="terminal-section">
+        <div class="terminal">
+            <div class="terminal-header">
+                <div class="term-dots">
+                    <div class="term-dot dot-red"></div>
+                    <div class="term-dot dot-yellow"></div>
+                    <div class="term-dot dot-green"></div>
+                </div>
+                <div class="terminal-title">jenkins@ec2-automation-master: ~/workspace/build-logs</div>
+            </div>
+            <div class="terminal-body" id="terminal-logs">> Connecting to deployment stream...</div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const terminalLogs = document.getElementById('terminal-logs');
+    const pipelineNodes = document.getElementById('pipeline-nodes');
+    const pipelineProgress = document.getElementById('pipeline-progress');
+    const overallStatus = document.getElementById('overall-status');
+    const overallStatusText = document.getElementById('overall-status-text');
+    const buildMeta = document.getElementById('build-meta');
+    const sourceMeta = document.getElementById('source-meta');
+    const stageSummary = document.getElementById('stage-summary');
+
+    let previousStagesState = '';
+
+    const STATUS_LABELS = {
+        SUCCESS: 'Completed',
+        IN_PROGRESS: 'Running',
+        FAILED: 'Failed',
+        PENDING: 'Pending',
+        SKIPPED: 'Skipped',
+    };
+
+    function statusClass(status) {
+        if (status === 'SUCCESS') return 'success';
+        if (status === 'IN_PROGRESS') return 'in_progress';
+        if (status === 'FAILED') return 'failed';
+        if (status === 'SKIPPED') return 'skipped';
+        return 'pending';
+    }
+
+    function renderOverallStatus(payload) {
+        const { result, building } = payload;
+        overallStatus.className = 'status-badge';
+
+        if (building || result === 'IN_PROGRESS') {
+            overallStatus.classList.add('progress');
+            overallStatusText.textContent = 'Pipeline Running';
+        } else if (result === 'SUCCESS') {
+            overallStatus.classList.add('success');
+            overallStatusText.textContent = 'Pipeline Succeeded';
+        } else if (result === 'FAILURE') {
+            overallStatus.classList.add('failed');
+            overallStatusText.textContent = 'Pipeline Failed';
+        } else {
+            overallStatus.classList.add('pending');
+            overallStatusText.textContent = 'Awaiting Build';
+        }
+
+        buildMeta.textContent = payload.buildNumber ? `Build #${payload.buildNumber}` : 'Build #—';
+        sourceMeta.textContent = `Source: ${payload.source || 'live'}`;
+    }
+
+    function renderStages(stages) {
+        pipelineNodes.innerHTML = '';
+
+        let completed = 0;
+        stages.forEach((stage, index) => {
+            const cls = statusClass(stage.status);
+            if (stage.status === 'SUCCESS') completed += 1;
+
+            const card = document.createElement('div');
+            card.className = 'stage-card';
+            card.innerHTML = `
+                <div class="step-index">Step ${index + 1}</div>
+                <div class="stage-icon ${cls}">${stage.icon || '•'}</div>
+                <div class="stage-name">${stage.name}</div>
+                <div class="stage-status ${cls}">${STATUS_LABELS[stage.status] || stage.status}</div>
+            `;
+            pipelineNodes.appendChild(card);
+        });
+
+        const progressPercent = stages.length > 1
+            ? Math.max(0, Math.min(100, ((completed - 1) / (stages.length - 1)) * 100))
+            : 0;
+        pipelineProgress.style.width = `${progressPercent}%`;
+        stageSummary.textContent = `${completed} / ${stages.length} complete`;
+    }
+
+    function colorizeLogLine(line) {
+        const lower = line.toLowerCase();
+        if (lower.includes('finished: success')) return 'log-success';
+        if (lower.includes('error') || lower.includes('failed') || lower.includes('failure')) return 'log-error';
+        return 'log-sys';
+    }
+
+    function renderLogs(logsText) {
+        const lines = logsText.split('\n').filter((line) => line.trim() !== '').slice(-80);
+        terminalLogs.innerHTML = lines
+            .map((line) => `<div class="${colorizeLogLine(line)}">${escapeHtml(line)}</div>`)
+            .join('');
+        terminalLogs.scrollTop = terminalLogs.scrollHeight;
+    }
+
+    function escapeHtml(value) {
+        return value
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;');
+    }
+
+    async function updatePipelineDashboard() {
+        try {
+            const statusRes = await fetch('/api/pipeline-status');
+            const payload = await statusRes.json();
+            const stages = payload.stages || [];
+
+            renderOverallStatus(payload);
+
+            const currentStateString = JSON.stringify(stages);
+            if (currentStateString !== previousStagesState) {
+                renderStages(stages);
+                previousStagesState = currentStateString;
+            }
+
+            const logRes = await fetch('/api/pipeline-logs');
+            const logsText = await logRes.text();
+            renderLogs(logsText);
+        } catch (err) {
+            overallStatus.className = 'status-badge failed';
+            overallStatusText.textContent = 'Dashboard Sync Error';
+            terminalLogs.innerHTML = `<div class="log-error">[System Alert] Connection to pipeline metrics lost: ${escapeHtml(err.message)}</div>`;
+        }
+    }
+
+    updatePipelineDashboard();
+    setInterval(updatePipelineDashboard, 2500);
+</script>
+</body>
+</html>

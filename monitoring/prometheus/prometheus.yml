@@ -1,0 +1,55 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: immverse-production
+    environment: production
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          role: monitoring
+
+  - job_name: node-public
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+        labels:
+          instance: public-ec2
+          host: 3.85.241.100
+
+  - job_name: node-private
+    static_configs:
+      - targets: ['10.0.2.183:9100']
+        labels:
+          instance: private-ec2
+          host: 10.0.2.183
+
+  - job_name: cadvisor-public
+    static_configs:
+      - targets: ['host.docker.internal:8088']
+        labels:
+          instance: public-ec2
+
+  - job_name: cadvisor-private
+    static_configs:
+      - targets: ['10.0.2.183:8088']
+        labels:
+          instance: private-ec2
+
+  - job_name: immverse-app
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['10.0.2.183:3000']
+        labels:
+          app: interview-production-app
+          instance: private-ec2
+
+  - job_name: jenkins
+    metrics_path: /prometheus/
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          instance: public-ec2
